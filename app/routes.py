@@ -1,5 +1,5 @@
 from flask import jsonify
-from app.config import Config
+from config import Config
 
 
 def register_routes(app):
@@ -23,3 +23,4 @@ def register_routes(app):
         return jsonify({
             "version": Config.VERSION
         })
+    
