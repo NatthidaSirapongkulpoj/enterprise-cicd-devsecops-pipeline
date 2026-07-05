@@ -1,11 +1,28 @@
+############################################
+# AWS Region
+############################################
+
 variable "aws_region" {
-  default = "ap-southeast-1"
+  description = "AWS Region"
+  type        = string
+  default     = "ap-southeast-1"
 }
 
-variable "instance_type" {
-  default = "t2.micro"
+############################################
+# EC2 Key Pair
+############################################
+
+variable "key_name" {
+  description = "Existing EC2 Key Pair"
+  type        = string
+  default     = "enterprise-cicd-key"
 }
+############################################
+# ECR Repository Name
+############################################
 
 variable "repository_name" {
-  default = "enterprise-cicd-app"
+  description = "ECR repository name"
+  type        = string
+  default     = "enterprise-cicd-app"
 }

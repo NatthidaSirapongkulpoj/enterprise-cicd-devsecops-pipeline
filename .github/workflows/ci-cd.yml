@@ -1,72 +1,61 @@
-name: Multi-Environment CI/CD Pipeline
+name: CI-CD Pipeline
 
 on:
   push:
     branches:
-      - dev
       - staging
       - main
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: enterprise-cicd-app
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
-        run: |
+      - run: |
           pip install -r requirements.txt
-          pip install pytest
+          pip install pytest flake8
 
-      - name: Run tests
-        run: PYTHONPATH=. pytest -v
+      - run: python -m flake8 app
+      - run: PYTHONPATH=. pytest -v
 
-  build:
+
+  build-and-push:
     needs: test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build Docker image
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
         run: |
-          docker build -t flask-app:${{ github.ref_name }} -f docker/Dockerfile .
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
-  deploy-dev:
-    needs: build
-    if: github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
+      - name: Build image
+        run: docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
 
-    steps:
-      - name: Deploy to DEV (simulated)
-        run: echo "Deploying to DEV environment"
+      - name: Tag image
+        run: |
+          docker tag $ECR_REPOSITORY:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
-  deploy-staging:
-    needs: build
-    if: github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Deploy to STAGING (simulated)
-        run: echo "Deploying to STAGING environment"
-
-  deploy-prod:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Production approval gate
-        run: echo "Manual approval recommended for PROD"
-
-      - name: Deploy to PROD (simulated)
-        run: echo "Deploying to PRODUCTION environment"
-        
+      - name: Push image
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+      
