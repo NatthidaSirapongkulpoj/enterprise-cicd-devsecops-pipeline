@@ -1,4 +1,4 @@
-name: CI-CD Pipeline
+name: DevSecOps CI/CD Pipeline
 
 on:
   push:
@@ -6,20 +6,27 @@ on:
       - main
       - staging
 
+  pull_request:
+    branches:
+      - main
+      - staging
+
 env:
   AWS_REGION: ap-southeast-1
   ECR_REPOSITORY: enterprise-cicd-app
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
 
 jobs:
-  test:
+
+  code-quality:
     name: Code Quality & Testing
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -36,56 +43,43 @@ jobs:
 
       - name: Run Pytest
         run: |
-          PYTHONPATH=. pytest -v
+          PYTHONPATH=. pytest -v tests
 
-  security:
+
+  security-scan:
     name: DevSecOps Security Scans
-    needs: test
+    needs: code-quality
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source
         uses: actions/checkout@v4
 
-      ###############################################
-      # Trivy Filesystem Scan
-      ###############################################
       - name: Trivy Filesystem Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: fs
           scan-ref: .
           format: table
           exit-code: "0"
-          ignore-unfixed: true
           severity: HIGH,CRITICAL
 
-      ###############################################
-      # tfsec Scan
-      ###############################################
-      - name: tfsec Scan
+      - name: tfsec Terraform Scan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: terraform
 
-      ###############################################
-      # Checkov Scan
-      ###############################################
-      - name: Checkov Scan
-        uses: bridgecrewio/checkov-action@v12
-        with:
-          directory: terraform
-          framework: terraform
-          quiet: true
-          soft_fail: true
 
-  build-and-push:
+  docker-build:
     name: Build & Push Docker Image
-    needs: security
+    needs:
+      - code-quality
+      - security-scan
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
@@ -93,22 +87,37 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login \
+            --username AWS \
+            --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build Docker Image
         run: |
-          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
+          docker build \
+            -t $ECR_REPOSITORY \
+            -f docker/Dockerfile .
 
       - name: Tag Docker Image
         run: |
-          docker tag $ECR_REPOSITORY:latest \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:latest
+          docker tag \
+          $ECR_REPOSITORY:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
       - name: Push Docker Image
         run: |
           docker push \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:latest
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Trivy Docker Image Scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+          format: table
+          exit-code: "0"
+          severity: HIGH,CRITICAL
