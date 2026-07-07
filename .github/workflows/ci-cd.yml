@@ -17,25 +17,28 @@ permissions:
 
 env:
   AWS_REGION: ap-southeast-1
+  AWS_ACCOUNT_ID: "277731793168"
   ECR_REPOSITORY: enterprise-cicd-app
+
+###############################################################################
+# Code Quality
+###############################################################################
 
 jobs:
 
-################################################################################
-# Code Quality
-################################################################################
-
   code-quality:
+
     name: Code Quality & Testing
+
     runs-on: ubuntu-latest
 
     steps:
 
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -54,17 +57,12 @@ jobs:
         run: |
           python -m flake8 app
 
-      - name: Run Unit Tests
+      - name: Run Pytest
         run: |
           PYTHONPATH=. pytest -v tests
 
-################################################################################
-# Bandit
-################################################################################
-
-      - name: Bandit Security Scan
+      - name: Run Bandit
         continue-on-error: true
-
         run: |
 
           mkdir -p security
@@ -76,24 +74,22 @@ jobs:
             -o security/bandit-report.txt || true
 
           echo ""
-          echo "================ BANDIT REPORT ================"
+          echo "========== BANDIT REPORT =========="
           cat security/bandit-report.txt || true
-          echo "==============================================="
+          echo "==================================="
 
       - name: Upload Bandit Report
         if: always()
-
         uses: actions/upload-artifact@v4
-
         with:
           name: bandit-report
           path: security/bandit-report.txt
 
-################################################################################
-# Terraform Validation
-################################################################################
+###############################################################################
+# Terraform
+###############################################################################
 
-  terraform-validation:
+  terraform:
 
     name: Terraform Validation
 
@@ -105,9 +101,9 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
 
       - name: Terraform Init
         run: terraform init -backend=false
@@ -118,9 +114,9 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-################################################################################
+###############################################################################
 # Checkov
-################################################################################
+###############################################################################
 
   checkov:
 
@@ -130,70 +126,64 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run Checkov
-
         uses: bridgecrewio/checkov-action@master
-
         with:
           directory: terraform
           framework: terraform
           output_format: cli
           soft_fail: true
 
-################################################################################
+###############################################################################
 # Docker Build
-################################################################################
+###############################################################################
 
-  docker-build:
+  docker:
 
     name: Docker Build
 
     needs:
       - code-quality
-      - terraform-validation
+      - terraform
       - checkov
 
     runs-on: ubuntu-latest
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build Docker Image
-
         run: |
-
           docker build \
             -f docker/Dockerfile \
             -t $ECR_REPOSITORY:latest .
 
-################################################################################
+###############################################################################
 # Trivy
-################################################################################
+###############################################################################
 
   trivy:
 
     name: Trivy Container Scan
 
-    needs: docker-build
+    needs: docker
 
     runs-on: ubuntu-latest
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build Docker Image
-
         run: |
-
           docker build \
             -f docker/Dockerfile \
             -t $ECR_REPOSITORY:latest .
 
-      - name: Run Trivy
+      - name: Run Trivy Scan
 
         run: |
 
@@ -206,9 +196,9 @@ jobs:
             --exit-code 0 \
             $ECR_REPOSITORY:latest
 
-################################################################################
-# Push ECR
-################################################################################
+###############################################################################
+# Push Image
+###############################################################################
 
   push-image:
 
@@ -223,26 +213,34 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configure AWS Credentials
-
-        uses: aws-actions/configure-aws-credentials@v4
-
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Credentials
+
+        run: |
+
+          echo "AWS Region : $AWS_REGION"
+          echo "AWS Account: $AWS_ACCOUNT_ID"
+
+          aws sts get-caller-identity
 
       - name: Login to Amazon ECR
 
         run: |
 
           aws ecr get-login-password \
-          --region $AWS_REGION | docker login \
-          --username AWS \
-          --password-stdin \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+            --region $AWS_REGION \
+            | docker login \
+            --username AWS \
+            --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build Docker Image
 
@@ -257,12 +255,12 @@ jobs:
         run: |
 
           docker tag \
-          $ECR_REPOSITORY:latest \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+            $ECR_REPOSITORY:latest \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
       - name: Push Docker Image
 
         run: |
 
           docker push \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
