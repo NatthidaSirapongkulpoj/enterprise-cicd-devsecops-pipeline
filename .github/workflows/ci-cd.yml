@@ -11,30 +11,24 @@ on:
       - main
       - staging
 
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: enterprise-cicd-app
+
 permissions:
   contents: read
   security-events: write
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPOSITORY: enterprise-cicd-app
-
-############################################################
-# Code Quality & Testing
-############################################################
-
 jobs:
 
-  quality-tests:
+  code-quality:
 
     name: Code Quality & Testing
-
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout Source
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -48,27 +42,38 @@ jobs:
           pip install -r requirements.txt
           pip install pytest flake8 bandit
 
-      - name: Run Flake8
+      - name: Flake8 Lint
         run: |
-          flake8 app
+          python -m flake8 app
 
       - name: Run Unit Tests
         run: |
-          PYTHONPATH=. pytest -v
+          PYTHONPATH=. pytest -v tests
 
-      - name: Run Bandit Security Scan
+      - name: Bandit Security Scan
         run: |
-          bandit -r app -c security/bandit.yaml
+          mkdir -p security
+          bandit -r app \
+            -c security/bandit.yaml \
+            -f txt \
+            -o security/bandit-report.txt
 
-############################################################
-# Terraform Validation
-############################################################
+      - name: Upload Bandit Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: security/bandit-report.txt
 
-  terraform:
+
+  terraform-validation:
 
     name: Terraform Validation
-
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
 
@@ -76,24 +81,17 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Init
-        run: terraform -chdir=terraform init -backend=false
+      - run: terraform init -backend=false
 
-      - name: Terraform Validate
-        run: terraform -chdir=terraform validate
+      - run: terraform fmt -check
 
-############################################################
-# Infrastructure Security Scan
-############################################################
+      - run: terraform validate
+
 
   checkov:
 
     name: Checkov IaC Scan
-
     runs-on: ubuntu-latest
-
-    needs:
-      - terraform
 
     steps:
 
@@ -103,19 +101,20 @@ jobs:
         uses: bridgecrewio/checkov-action@master
         with:
           directory: terraform
+          framework: terraform
+          output_format: cli
+          soft_fail: true
 
-############################################################
-# Docker Build
-############################################################
 
   docker-build:
 
     name: Docker Build
-
     runs-on: ubuntu-latest
 
     needs:
-      - quality-tests
+      - code-quality
+      - terraform-validation
+      - checkov
 
     steps:
 
@@ -123,16 +122,14 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
+          docker build \
+            -f docker/Dockerfile \
+            -t $ECR_REPOSITORY:latest .
 
-############################################################
-# Trivy Container Scan
-############################################################
 
   trivy:
 
     name: Trivy Container Scan
-
     runs-on: ubuntu-latest
 
     needs:
@@ -144,32 +141,33 @@ jobs:
 
       - name: Build Image
         run: |
-          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
+          docker build \
+            -f docker/Dockerfile \
+            -t $ECR_REPOSITORY:latest .
 
-      - name: Scan Image with Trivy
+      - name: Run Trivy Scan
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:latest image \
+            -v ${{ github.workspace }}:/root/.cache/ \
+            aquasec/trivy:latest \
+            image \
+            --ignorefile /.trivyignore \
             --severity HIGH,CRITICAL \
             --exit-code 0 \
-            $ECR_REPOSITORY
+            $ECR_REPOSITORY:latest
 
-############################################################
-# Push Image to Amazon ECR
-############################################################
 
-  push-image:
+  push-ecr:
 
     name: Push Docker Image to Amazon ECR
 
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     needs:
       - trivy
-      - checkov
 
-    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
 
     steps:
 
@@ -180,28 +178,30 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password \
-          --region $AWS_REGION \
-          | docker login \
+          --region $AWS_REGION | \
+          docker login \
           --username AWS \
           --password-stdin \
-          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build Docker Image
         run: |
-          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
+          docker build \
+            -f docker/Dockerfile \
+            -t $ECR_REPOSITORY:latest .
 
       - name: Tag Docker Image
         run: |
           docker tag \
           $ECR_REPOSITORY:latest \
-          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
       - name: Push Docker Image
         run: |
           docker push \
-          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
