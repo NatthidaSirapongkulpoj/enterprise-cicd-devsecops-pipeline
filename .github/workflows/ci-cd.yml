@@ -35,7 +35,7 @@ jobs:
     steps:
 
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -101,7 +101,7 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: hashicorp/setup-terraform@v4
 
@@ -126,7 +126,7 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@master
@@ -153,7 +153,7 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Build Docker Image
         run: |
@@ -175,7 +175,7 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Build Docker Image
         run: |
@@ -213,7 +213,7 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
