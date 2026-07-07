@@ -1,68 +1,30 @@
-# 🚀 Enterprise CI/CD DevSecOps Pipeline on AWS
+# Enterprise CI/CD DevSecOps Pipeline on AWS
 
-> Secure • Automated • Reproducible • Infrastructure as Code
-
-An enterprise-grade DevSecOps pipeline built on **Amazon Web Services (AWS)** that automates infrastructure provisioning, application packaging, security validation, and deployment using modern Cloud Engineering practices.
-
-This project demonstrates how Infrastructure as Code (Terraform), Docker, GitHub Actions, automated testing, and security scanning can be integrated into a repeatable Continuous Integration and Continuous Deployment (CI/CD) workflow.
-
----
+> Enterprise-grade CI/CD and DevSecOps pipeline demonstrating Infrastructure as Code (Terraform), Docker containerization, GitHub Actions automation, security validation, and automated deployment on AWS.
 
 ![Architecture](screenshots/architecture-diagram.png)
 
 ---
 
-## 📌 Project Highlights
+## Project Overview
 
-✔ Infrastructure as Code using Terraform
+Modern cloud platforms require more than infrastructure provisioning—they require secure, automated, repeatable software delivery.
 
-✔ Automated CI/CD with GitHub Actions
+This project demonstrates how enterprise engineering teams can automate application deployment by integrating Infrastructure as Code (IaC), containerization, CI/CD, and DevSecOps into a single cloud-native delivery pipeline.
 
-✔ Dockerized Python Flask Application
+The solution provisions AWS infrastructure with Terraform, builds and scans Docker images, performs automated testing and security validation, publishes images to Amazon ECR, and deploys containerized applications to Amazon EC2 through GitHub Actions.
 
-✔ Amazon Elastic Container Registry (ECR)
-
-✔ Amazon EC2 Deployment
-
-✔ Security Scanning (Bandit • Checkov • Trivy)
-
-✔ Automated Unit Testing
-
-✔ Environment Configuration
-
-✔ Enterprise-ready Repository Structure
-
-✔ Modular Infrastructure Design
+This repository emphasizes engineering best practices including automation, repeatability, security-by-design, and infrastructure consistency.
 
 ---
 
-# Why This Project
+# Enterprise Architecture
 
-Modern cloud platforms require much more than provisioning virtual machines.
+![Enterprise Architecture](screenshots/architecture-diagram.png)
 
-Cloud Engineers are expected to build secure, automated, scalable deployment pipelines that integrate:
+The deployment workflow follows an enterprise DevSecOps model:
 
-- Infrastructure Automation
-- Continuous Integration
-- Continuous Delivery
-- Security Validation
-- Containerization
-- Cloud Networking
-- Testing Automation
-
-This project demonstrates an end-to-end DevSecOps workflow that follows industry best practices and emphasizes automation, repeatability, and maintainability.
-
----
-
-# Solution Architecture
-
-The deployment workflow follows the architecture below.
-
-![Architecture Diagram](screenshots/architecture-diagram.png)
-
-### Workflow
-
-```text
+```
 Developer
       │
       ▼
@@ -71,31 +33,63 @@ GitHub Repository
       ▼
 GitHub Actions
       │
-      ├── Code Validation
-      ├── Unit Tests
-      ├── Security Scans
+      ├── Code Quality (Flake8)
+      ├── Unit Testing (Pytest)
+      ├── Security Analysis
+      │      ├── CodeQL
       │      ├── Bandit
       │      ├── Checkov
       │      └── Trivy
       │
-      ├── Docker Build
-      ├── Push Image to Amazon ECR
+      ▼
+Docker Build
+      │
+      ▼
+Amazon ECR
+      │
+      ▼
+Terraform
+      │
+      ▼
+AWS Infrastructure
       │
       ▼
 Amazon EC2
       │
       ▼
-Flask Web Application
+Docker Container
+      │
+      ▼
+Python Flask Application
 ```
+
+---
+
+# Key Features
+
+- Enterprise CI/CD pipeline using GitHub Actions
+- Infrastructure as Code (Terraform)
+- Automated AWS infrastructure provisioning
+- Docker containerization
+- Amazon ECR image management
+- Amazon EC2 deployment
+- Automated unit testing with Pytest
+- Code quality validation using Flake8
+- Static Application Security Testing (Bandit)
+- Infrastructure security scanning (Checkov)
+- Container vulnerability scanning (Trivy)
+- GitHub CodeQL security analysis
+- Environment-specific deployment configuration
+- Production-ready cloud deployment workflow
 
 ---
 
 # Technology Stack
 
 | Category | Technologies |
-|------------|--------------|
+|-----------|--------------|
 | Cloud Platform | AWS |
-| Infrastructure as Code | Terraform |
+| Infrastructure | Terraform |
 | CI/CD | GitHub Actions |
 | Container | Docker |
 | Registry | Amazon ECR |
@@ -103,237 +97,243 @@ Flask Web Application
 | Programming | Python |
 | Framework | Flask |
 | Testing | Pytest |
-| Security | Bandit, Checkov, Trivy |
-| Version Control | Git & GitHub |
+| Code Quality | Flake8 |
+| Security | Bandit, Checkov, Trivy, CodeQL |
+| Version Control | Git, GitHub |
 
 ---
 
-# Repository Structure
+# AWS Infrastructure
 
-```
+Terraform provisions the following AWS resources:
+
+- Amazon EC2
+- Amazon ECR
+- IAM Role
+- VPC
+- Public Subnet
+- Security Group
+
+Infrastructure is fully version-controlled and reproducible through Infrastructure as Code.
+
+---
+
+# CI/CD Workflow
+
+The deployment pipeline executes the following stages automatically.
+
+## 1. Source Control
+
+Developers push source code to GitHub.
+
+## 2. Continuous Integration
+
+GitHub Actions automatically:
+
+- Install dependencies
+- Execute unit tests
+- Validate code quality
+- Run security scans
+
+## 3. Security Gates
+
+Security validation includes:
+
+| Tool | Purpose |
+|------|----------|
+| CodeQL | Source Code Analysis |
+| Bandit | Python SAST |
+| Checkov | Terraform IaC Scan |
+| Trivy | Docker Image Vulnerability Scan |
+
+Only validated builds continue through the deployment pipeline.
+
+## 4. Container Build
+
+Docker builds an immutable application image.
+
+## 5. Image Registry
+
+Docker image is pushed to Amazon ECR.
+
+## 6. Infrastructure Provisioning
+
+Terraform provisions AWS infrastructure automatically.
+
+## 7. Deployment
+
+Amazon EC2 pulls the container image from Amazon ECR and starts the application.
+
+---
+
+# Project Structure
+
+```text
 enterprise-cicd-devsecops-pipeline
 │
 ├── .github/
 │   └── workflows/
+│       └── ci-cd.yml
 │
 ├── app/
 │
 ├── docker/
 │
-├── docs/
-│
-├── environments/
-│
-├── screenshots/
-│
-├── security/
-│
 ├── terraform/
 │
 ├── tests/
 │
+├── security/
+│
+├── environments/
+│
+├── docs/
+│
+├── screenshots/
+│   ├── architecture-diagram.png
+│   ├── github-actions-success.png
+│   ├── aws-ecr-repository.png
+│   ├── aws-ec2-instance-running.png
+│   ├── ec2-docker-ps.png
+│   ├── flask-home-page.png
+│   └── project-folder-structure.png
+│
 ├── README.md
-├── requirements.txt
-└── setup.cfg
+├── SECURITY.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── LICENSE
 ```
 
 ---
 
-# Infrastructure Components
+# Deployment Evidence
 
-Terraform provisions AWS resources including:
-
-- Amazon EC2
-- Amazon ECR
-- IAM Roles
-- Security Groups
-- Networking
-- Variables
-- Outputs
-
-Infrastructure is designed to be modular, reusable, and maintainable.
-
----
-
-# CI/CD Pipeline
-
-The GitHub Actions workflow performs the following stages automatically.
-
-### Stage 1
-
-Source Checkout
-
-↓
-
-### Stage 2
-
-Install Python Dependencies
-
-↓
-
-### Stage 3
-
-Static Code Validation
-
-↓
-
-### Stage 4
-
-Run Unit Tests
-
-↓
-
-### Stage 5
-
-Security Scanning
-
-- Bandit
-- Checkov
-- Trivy
-
-↓
-
-### Stage 6
-
-Docker Image Build
-
-↓
-
-### Stage 7
-
-Push Image to Amazon ECR
-
-↓
-
-### Stage 8
-
-Deploy Application to Amazon EC2
-
----
-
-# Security Controls
-
-Security is integrated throughout the deployment lifecycle.
-
-Implemented controls include:
-
-- Static Application Security Testing (SAST)
-- Infrastructure Security Validation
-- Docker Image Vulnerability Scanning
-- Least Privilege IAM Principles
-- Infrastructure as Code Validation
-- Secret Exclusion using `.gitignore`
-
----
-
-# Deployment Screenshots
-
-## 📂 Project Structure
-
-![Project Structure](screenshots/project-folder-structure.png)
-
----
-
-## ⚙ GitHub Actions Pipeline
+## GitHub Actions Pipeline
 
 ![GitHub Actions](screenshots/github-actions-success.png)
 
+The pipeline successfully completed CI/CD validation and deployment.
+
 ---
 
-## 📦 Amazon ECR Repository
+## Amazon ECR Repository
 
 ![Amazon ECR](screenshots/aws-ecr-repository.png)
 
----
-
-## ☁ Amazon EC2 Instance
-
-![Amazon EC2](screenshots/aws-ec2-instance-running.png)
+Docker images are securely stored in Amazon Elastic Container Registry.
 
 ---
 
-## 🌐 Running Flask Application
+## Amazon EC2 Instance
+
+![EC2](screenshots/aws-ec2-instance-running.png)
+
+Terraform provisions an EC2 instance to host the application.
+
+---
+
+## Running Docker Container
+
+![Docker Container](screenshots/ec2-docker-ps.png)
+
+Application container running successfully on Amazon EC2.
+
+---
+
+## Running Application
 
 ![Flask Application](screenshots/flask-home-page.png)
 
----
-
-# Project Documentation
-
-Additional documentation is available in the `docs` directory.
-
-- AWS Setup
-- Deployment Guide
-- Security Guide
-- Cost Estimation
-- Troubleshooting
-- Lessons Learned
+Python Flask application deployed and accessible through the EC2 public IP.
 
 ---
 
-# Skills Demonstrated
+# Documentation
 
-This project demonstrates practical experience in:
+Additional project documentation is available in the `docs/` directory.
 
-- AWS Cloud Infrastructure
-- Cloud Engineering
-- Infrastructure as Code
-- Terraform
-- GitHub Actions
-- Docker
-- CI/CD
-- DevSecOps
-- Infrastructure Security
-- Cloud Networking
-- Python Automation
-- Linux
-- Version Control
-- Infrastructure Validation
-- Continuous Delivery
+| Document | Description |
+|-----------|-------------|
+| AWS_SETUP.md | AWS account and environment setup |
+| deployment-guide.md | Deployment instructions |
+| TROUBLESHOOTING.md | Common troubleshooting scenarios |
+| security.md | Security implementation |
+| cost-estimation.md | Estimated AWS cost |
+| lessons-learned.md | Project reflections and improvements |
+
+---
+
+# Security
+
+This project follows DevSecOps principles.
+
+Security controls include:
+
+- Least Privilege IAM
+- Infrastructure as Code validation
+- Static Application Security Testing
+- Container vulnerability scanning
+- GitHub CodeQL analysis
+- Immutable container deployment
+- Automated security validation during CI/CD
+
+Additional details are available in:
+
+- SECURITY.md
+- security/
 
 ---
 
 # Future Enhancements
 
-Planned improvements include:
+Potential future improvements include:
 
 - Amazon ECS
-- AWS Fargate
-- Application Load Balancer
-- Auto Scaling
-- Route 53
-- AWS Certificate Manager (HTTPS)
-- CloudWatch Dashboard
-- AWS WAF
+- Amazon EKS
 - Blue/Green Deployment
-- GitHub OIDC Authentication
-- Terraform Remote Backend
-- Terraform State Locking with DynamoDB
+- Canary Deployment
+- AWS Secrets Manager
+- AWS Systems Manager
+- Prometheus & Grafana
+- OpenTelemetry
+- Multi-Environment Promotion
+- Automated Rollback Strategy
 
 ---
 
-# Key Takeaways
+# Skills Demonstrated
 
-This project strengthened practical experience in:
-
-- Designing cloud infrastructure using Infrastructure as Code.
-- Building secure and repeatable CI/CD pipelines.
-- Applying DevSecOps principles throughout the software delivery lifecycle.
-- Automating deployments using GitHub Actions.
-- Managing AWS resources using Terraform.
-- Integrating security validation into deployment workflows.
-- Deploying containerized applications on AWS.
+- AWS Cloud Engineering
+- Infrastructure as Code
+- DevSecOps
+- Continuous Integration
+- Continuous Deployment
+- Docker Containerization
+- Terraform Automation
+- Cloud Security
+- Infrastructure Automation
+- Production Deployment
+- Technical Documentation
+- CI/CD Pipeline Design
 
 ---
 
 # Author
 
-## Natthida Sirapongkulpoj
+**Natthida Sirapongkulpoj**
 
-Cloud Engineer | AWS 
+AWS Certified Cloud Practitione
+AWS re/Start Graduate (400+ Hours training & 69 Hands-on Labs)
+
+Cloud Engineer • Solutions Architect • DevSecOps • Infrastructure as Code • AI/LLM
 
 - GitHub: https://github.com/NatthidaSirapongkulpoj
 
+- LinkedIn: https://www.linkedin.com/in/natthidasirapongkulpoj/
+
 ---
 
-⭐ If you found this project helpful, feel free to star the repository.
+## License
+
+This project is licensed under the MIT License.
