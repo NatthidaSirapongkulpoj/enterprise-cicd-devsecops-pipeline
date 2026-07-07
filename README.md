@@ -323,7 +323,7 @@ Potential future improvements include:
 
 **Natthida Sirapongkulpoj**
 
-AWS Certified Cloud Practitione
+AWS Certified Cloud Practitioner
 AWS re/Start Graduate (400+ Hours training & 69 Hands-on Labs)
 
 Cloud Engineer • Solutions Architect • DevSecOps • Infrastructure as Code • AI/LLM
