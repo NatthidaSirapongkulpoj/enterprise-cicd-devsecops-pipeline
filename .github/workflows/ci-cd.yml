@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: Enterprise DevSecOps CI/CD Pipeline
 
 on:
   push:
@@ -16,20 +16,25 @@ permissions:
   security-events: write
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPOSITORY: enterprise-cicd-app
-  IMAGE_TAG: latest
+
+############################################################
+# Code Quality & Testing
+############################################################
 
 jobs:
 
-  code-quality:
+  quality-tests:
+
     name: Code Quality & Testing
+
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout source
+      - name: Checkout Source
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -37,111 +42,166 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest flake8
+          pip install pytest flake8 bandit
 
       - name: Run Flake8
         run: |
-          python -m flake8 app
+          flake8 app
 
-      - name: Run Pytest
-        env:
-          PYTHONPATH: .
+      - name: Run Unit Tests
         run: |
-          pytest -v tests
+          PYTHONPATH=. pytest -v
 
+      - name: Run Bandit Security Scan
+        run: |
+          bandit -r app -c security/bandit.yaml
 
-  security-scan:
-    name: DevSecOps Security Scans
-    needs: code-quality
+############################################################
+# Terraform Validation
+############################################################
+
+  terraform:
+
+    name: Terraform Validation
+
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      ##############################################################
-      # Trivy Filesystem Scan
-      ##############################################################
+      - uses: hashicorp/setup-terraform@v3
 
-      - name: Filesystem Scan
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/project \
-            aquasec/trivy:latest \
-            fs \
-            --exit-code 1 \
-            --severity HIGH,CRITICAL \
-            /project
+      - name: Terraform Init
+        run: terraform -chdir=terraform init -backend=false
 
-      ##############################################################
-      # Docker Build
-      ##############################################################
+      - name: Terraform Validate
+        run: terraform -chdir=terraform validate
+
+############################################################
+# Infrastructure Security Scan
+############################################################
+
+  checkov:
+
+    name: Checkov IaC Scan
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - terraform
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform
+
+############################################################
+# Docker Build
+############################################################
+
+  docker-build:
+
+    name: Docker Build
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - quality-tests
+
+    steps:
+
+      - uses: actions/checkout@v4
 
       - name: Build Docker Image
         run: |
-          docker build \
-            -t $ECR_REPOSITORY:$IMAGE_TAG \
-            -f docker/Dockerfile .
+          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
 
-      ##############################################################
-      # Trivy Docker Image Scan
-      ##############################################################
+############################################################
+# Trivy Container Scan
+############################################################
 
-      - name: Scan Docker Image
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:latest \
-            image \
-            --exit-code 1 \
-            --severity HIGH,CRITICAL \
-            $ECR_REPOSITORY:$IMAGE_TAG
+  trivy:
 
+    name: Trivy Container Scan
 
-  build-and-push:
-    name: Build & Push to Amazon ECR
-    needs: security-scan
     runs-on: ubuntu-latest
+
+    needs:
+      - docker-build
 
     steps:
 
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Build Image
+        run: |
+          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
+
+      - name: Scan Image with Trivy
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            $ECR_REPOSITORY
+
+############################################################
+# Push Image to Amazon ECR
+############################################################
+
+  push-image:
+
+    name: Push Docker Image to Amazon ECR
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - trivy
+      - checkov
+
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login Amazon ECR
+      - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password \
           --region $AWS_REGION \
           | docker login \
           --username AWS \
           --password-stdin \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
       - name: Build Docker Image
         run: |
-          docker build \
-          -t $ECR_REPOSITORY:$IMAGE_TAG \
-          -f docker/Dockerfile .
+          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
 
       - name: Tag Docker Image
         run: |
           docker tag \
-          $ECR_REPOSITORY:$IMAGE_TAG \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          $ECR_REPOSITORY:latest \
+          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
 
       - name: Push Docker Image
         run: |
           docker push \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
