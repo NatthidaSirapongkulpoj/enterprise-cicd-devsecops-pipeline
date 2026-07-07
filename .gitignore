@@ -9,6 +9,11 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
 # ==========================================================
 # Terraform
@@ -19,9 +24,23 @@ venv/
 crash.log
 terraform.tfvars
 terraform.tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
-# Sensitive files
+# Terraform sensitive files
 terraform/password.txt
+
+# ==========================================================
+# Environment Variables & Secrets
+# ==========================================================
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
 
 # ==========================================================
 # Docker
@@ -32,23 +51,32 @@ terraform/password.txt
 # Logs
 # ==========================================================
 *.log
+logs/
 
 # ==========================================================
-# Environment Variables
-# ==========================================================
-.env
-
-# ==========================================================
-# VS Code
+# IDE / Editor
 # ==========================================================
 .vscode/
+.idea/
 
 # ==========================================================
-# macOS
+# Operating System
 # ==========================================================
 .DS_Store
+Thumbs.db
+Desktop.ini
 
 # ==========================================================
-# Windows
+# Temporary Files
 # ==========================================================
-Thumbs.db
+structure.txt
+*.tmp
+*.temp
+
+# ==========================================================
+# Security Scan Output (Generated)
+# Uncomment if these reports are generated automatically
+# ==========================================================
+# security/trivy-results.json
+# security/checkov-results.json
+# security/bandit-results.json
