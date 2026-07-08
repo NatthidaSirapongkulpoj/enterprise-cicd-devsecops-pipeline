@@ -4,7 +4,8 @@
 
 <p align="center">
 
-<img src="screenshots/social-preview.png"
+<p align="center">
+  <img src="./screenshots/social-preview.png" alt="Enterprise DevSecOps Pipeline" width="100%">
 
 </p>
 
