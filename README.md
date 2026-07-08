@@ -1,7 +1,5 @@
 <p align="center">
-
-<p align="center">
-  <img src="screenshots/social-preview.png" alt="Enterprise DevSecOps Pipeline" width="100%">
+  <img src="./screenshots/social-preview.png" alt="Enterprise DevSecOps Pipeline" width="100%">
 </p>
 
 Production-ready AWS Infrastructure Provisioning and Secure CI/CD Pipeline using Terraform, Docker, GitHub Actions, Amazon ECR and EC2.
